@@ -55,39 +55,58 @@ public class XHTMLExtensionProvider implements PacketExtensionProvider {
         int startDepth = parser.getDepth();
         int depth = parser.getDepth();
         String lastTag = "";
+        // TODO: Find better way to parse HTML, this code needs to DIAF
         while (!done) {
             int eventType = parser.next();
             if (eventType == XmlPullParser.START_TAG) {
                 if (parser.getName().equals("body")) {
                     buffer = new StringBuilder();
+                    buffer.append("<body xmlns='" +  parser.getNamespace() +  "' >");
                     depth = parser.getDepth();
                 }
+                else if(parser.getName().equals("hr") || parser.getName().equals("br"))
+                {
+                	buffer.append("<" + parser.getName() + "/>");
+                }
+                else
+                {
+                	buffer.append("<" + parser.getName());
+                	for(int i = 0; i < parser.getAttributeCount(); ++i)
+                	{
+                		buffer.append(" " + parser.getAttributeName(i) + "='" + parser.getAttributeValue(i) + "'");
+                	}
+                	if (parser.getName().equals("img"))
+                		buffer.append(" /");
+                	buffer.append(">");
+                }
                 lastTag = parser.getText();
-                buffer.append(parser.getText());
+                if(lastTag != null)
+                	buffer.append(lastTag);
             } else if (eventType == XmlPullParser.TEXT) {
                 if (buffer != null) {
                     // We need to return valid XML so any inner text needs to be re-escaped
-                    buffer.append(StringUtils.escapeForXML(parser.getText()));
+                	String text = parser.getText();
+                	if(text != null)
+                		buffer.append(StringUtils.escapeForXML(text));
                 }
             } else if (eventType == XmlPullParser.END_TAG) {
-                if (parser.getName().equals("body") && parser.getDepth() <= depth) {
-                    buffer.append(parser.getText());
+                if (parser.getName().equals("body") && parser.getDepth() <= depth) {                	
+                    buffer.append("</body>");
                     xhtmlExtension.addBody(buffer.toString());
                 }
-                else if (parser.getName().equals(xhtmlExtension.getElementName())
-                        && parser.getDepth() <= startDepth) {
+                else if (parser.getDepth() <= startDepth) {                	
                     done = true;
                 }
                 else {
-                    // This is a check for tags that are both a start and end tag like <br/>
-                    // So that they aren't doubled
-                    if(!lastTag.equals(parser.getText())) {
-                        buffer.append(parser.getText());
-                    }
+                    // This is where we close our tags and do some last minute things.
+                	String name = parser.getName();
+                	if (name != null && !name.equals("br") && !name.equals("hr") && !name.equals("img"))
+                		buffer.append("</" + name + ">");
                 }
             }
         }
 
+        System.out.println(xhtmlExtension.toXML());
         return xhtmlExtension;
     }
 
